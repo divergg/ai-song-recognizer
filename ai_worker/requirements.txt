@@ -1,0 +1,9 @@
+aio-pika==9.5.5
+aiohttp==3.11.13
+openai==1.66.2
+pyautogen==0.8.1
+pydantic==2.10.6
+pydantic-settings==2.8.1
+python-dotenv==1.0.1
+uvicorn==0.34.0
+httpx-socks[asyncio]==0.10.0
