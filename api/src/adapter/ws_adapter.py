@@ -173,7 +173,7 @@ class WsAdapter:
         out_event = WsOutEvent.from_message(msg)
         for websocket in self.app.opened_ws.get(msg.chat_id, []):
             data: WsNewMessageEvent = out_event
-            if data.event == 'newMessage':
+            if data.event == 'newMessage' and "Something went wrong. Try again later" not in data.data.text:
                 await self._save_result_to_cache(artist=data.data.artist,
                                                  title=data.data.title,
                                                  countries=data.data.countries,
