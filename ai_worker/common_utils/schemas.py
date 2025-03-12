@@ -63,6 +63,8 @@ class ResponseMessage(Message):
     user_message_id: str
     response: str
     countries: list
+    title: str
+    artist: str
 
 
 

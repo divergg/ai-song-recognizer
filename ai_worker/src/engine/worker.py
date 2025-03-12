@@ -1,6 +1,8 @@
 import copy
 import json
 
+from typing import Callable, Awaitable
+
 import httpx
 from httpx_socks import AsyncProxyTransport, SyncProxyTransport
 from src.configs import settings
@@ -34,9 +36,11 @@ class Engine:
         self.llm_config = {"config_list": [{"model": settings.ai.model, "api_key": settings.ai.token, "http_client": self.http_client}], "temperature": 0.0}
 
     async def query(
-        self, artist: str, title: str
+        self, artist: str, title: str, status_callback: Callable[[QueryStatus], Awaitable[None]]
     ) -> dict:
         """Make GPT queries"""
+
+        await status_callback(QueryStatus.WAITING_FOR_RESPONSE)
 
         default_response = "Could not retrieve track lyrics. Try again later"
 

@@ -15,7 +15,7 @@ from src.utils.token import verify_token
 from src.exceptions.exceptions import MethodNotAllowedError, InternalError, JsonDecodeError, MissingDataError
 from src.repository.mongo_repo import MongodbRepository
 from src.configs import settings
-from src.adapter.models import WsOutEvent
+from src.adapter.models import WsOutEvent, WsNewMessageEvent, MessageData
 from common_utils.log_util import setup_file_logger
 from common_utils.schemas import UserMessage, StatusMessage, WsAuthRequest, Message, WsAuthResponse
 
@@ -61,7 +61,7 @@ class WsAdapter:
         method = self.methods.get(client_data.get("method"))
         if method is not None:
             try:
-                await method(chat_id, client_data)
+                await method(chat_id, client_data, websocket)
                 logger.info(f"{chat_id}\t{method} successful")
                 await websocket.send_json(
                     {
@@ -85,18 +85,31 @@ class WsAdapter:
                MethodNotAllowedError().to_json()
             )
 
-    async def _recognize_song(self, chat_id: str, client_data: dict):
+    async def _recognize_song(self, chat_id: str, client_data: dict, websocket):
         artist = client_data["artist"]
         title = client_data["title"]
         message_id = client_data["id"]
         logger.info(f"received title: {title}. received artist: {artist}")
-        data = UserMessage(
-            chat_id=chat_id,
-            message_id=message_id,
-            artist=artist,
-            title=title
-        )
-        await self._recognize_song_request(data)
+        cache, countries = await self._find_result_in_cache(artist=artist, title=title)
+        if cache:
+            data = WsNewMessageEvent(
+                data=MessageData(
+                    user_message_id=message_id,
+                    text=cache,
+                    countries=countries,
+                    title=title,
+                    artist=artist,
+                )
+            )
+            await websocket.send_text(data.model_dump_json())
+        else:
+            data = UserMessage(
+                chat_id=chat_id,
+                message_id=message_id,
+                artist=artist,
+                title=title
+            )
+            await self._recognize_song_request(data)
 
     async def _recognize_song_request(self, data: UserMessage):
         await self.send_to_rabbitmq(data)
@@ -106,7 +119,12 @@ class WsAdapter:
         result: dict = await self.client.find_one(collection_name=settings.database.collection_name,
                                     query={"artist": artist, "title": title})
         if result:
-            return result.get('result', None)
+            return result.get('result', None), result.get('countries', [])
+        return None, None
+
+    async def _save_result_to_cache(self, artist: str, title: str, countries: list, result: str):
+        result: dict = await self.client.insert_one(collection_name=settings.database.collection_name,
+                                    query={"artist": artist, "title": title, "result": result, "countries": countries})
 
 
     async def send_to_rabbitmq(self, message: UserMessage):
@@ -154,6 +172,12 @@ class WsAdapter:
         logger.info(f'Message for worker - {msg}')
         out_event = WsOutEvent.from_message(msg)
         for websocket in self.app.opened_ws.get(msg.chat_id, []):
+            data: WsNewMessageEvent = out_event
+            if data.event == 'newMessage':
+                await self._save_result_to_cache(artist=data.data.artist,
+                                                 title=data.data.title,
+                                                 countries=data.data.countries,
+                                                 result=data.data.text)
             await websocket.send_text(out_event.model_dump_json())
 
     def build_app(self):

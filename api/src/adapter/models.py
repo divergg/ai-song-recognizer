@@ -40,7 +40,9 @@ class WsOutEvent(WsOutMessage):
                 data=MessageData(
                     user_message_id=message.user_message_id,
                     text=message.response,
-                    countries=message.countries
+                    countries=message.countries,
+                    title=message.title,
+                    artist=message.artist
 
                 )
             )
@@ -70,6 +72,8 @@ class MessageData(BaseModel):
     user_message_id: str
     text: str
     countries: Optional[list] = None
+    title: str
+    artist: str
 
 
 class WsNewMessageEvent(WsOutEvent):

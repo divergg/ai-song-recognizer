@@ -31,5 +31,14 @@ class MongodbRepository(IDatabaseRepository):
             raise
 
 
+    async def insert_one(self, collection_name: str, document: dict):
+        try:
+            result = await self.__db[collection_name].insert_one(document)
+            return result
+        except Exception as e:
+            self.logger.error(f"Error adding the document:\n{e}")
+            raise
+
+
 
 

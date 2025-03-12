@@ -47,6 +47,9 @@ def message_handler(out_exchange: AbstractExchange, out_queue: AbstractQueue):
                 process_coro = engine.query(
                     artist=msg.artist,
                     title=msg.title,
+                    status_callback=create_status_callback(
+                        msg.chat_id, msg.message_id, out_exchange, out_queue
+                    ),
                 )
                 task = asyncio.wait_for(process_coro, timeout=200)
                 result: dict = await task
@@ -56,7 +59,7 @@ def message_handler(out_exchange: AbstractExchange, out_queue: AbstractQueue):
 
             logger.info(f"{msg.message_id} Response: {result}")
             response_msg = ResponseMessage(
-                chat_id=msg.chat_id, user_message_id=msg.message_id, response=result.get("response"), countries=result.get("countries")
+                chat_id=msg.chat_id, user_message_id=msg.message_id, response=result.get("response"), countries=result.get("countries"), title=msg.title, artist=msg.artist
             )
             await out_exchange.publish(
                 response_msg.prepare(), routing_key=out_queue.name
